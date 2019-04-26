@@ -14,8 +14,8 @@ class ResponderMicroservice extends NioMicroservice[Array[Byte], Array[Byte]]("r
 
   import ResponderMicroservice._
 
-  private val NormalTopic = topicSet(config.getStringList("normal-input-topics").asScala)
-  private val ErrorTopic = topicSet(config.getStringList("error-input-topics").asScala)
+  private val NormalTopic = topicMatcher(config.getStringList("normal-input-topics").asScala)
+  private val ErrorTopic = topicMatcher(config.getStringList("error-input-topics").asScala)
 
   override def processRecord(input: ConsumerRecord[String, Array[Byte]]): ProducerRecord[String, Array[Byte]] = {
     input.topic() match {
@@ -59,7 +59,7 @@ class ResponderMicroservice extends NioMicroservice[Array[Byte], Array[Byte]]("r
 }
 
 object ResponderMicroservice {
-  private def topicSet(topics: Iterable[String]) = {
+  private def topicMatcher(topics: Iterable[String]) = {
     val set = topics.toSet
     object TopicSet {
       def unapply(x: String): Option[String] = Some(x).filter(set.contains)
