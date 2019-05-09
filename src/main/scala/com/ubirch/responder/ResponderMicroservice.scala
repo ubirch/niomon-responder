@@ -1,59 +1,90 @@
 package com.ubirch.responder
 
 import java.nio.charset.StandardCharsets.UTF_8
+import java.util.UUID
 
-import com.ubirch.niomon.base.NioMicroservice
+import com.fasterxml.jackson.databind.JsonNode
 import com.ubirch.kafka._
+import com.ubirch.niomon.base.NioMicroservice
+import com.ubirch.niomon.util.{KafkaPayload, KafkaPayloadFactory}
+import com.ubirch.protocol.ProtocolMessage
+import com.ubirch.responder.ResponderMicroservice._
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.header.internals.RecordHeader
+import org.json4s.JsonAST.{JString, JValue}
+import org.json4s.jackson.JsonMethods
 
 import scala.collection.JavaConverters._
+import scala.util.Try
 
-class ResponderMicroservice extends NioMicroservice[Array[Byte], Array[Byte]]("responder") {
-
-  import ResponderMicroservice._
-
-  private val NormalTopic = topicMatcher(config.getStringList("normal-input-topics").asScala)
-  private val ErrorTopic = topicMatcher(config.getStringList("error-input-topics").asScala)
-
-  override def processRecord(input: ConsumerRecord[String, Array[Byte]]): ProducerRecord[String, Array[Byte]] = {
-    input.topic() match {
-      case NormalTopic(topic) => handleNormal(topic, input)
-      case ErrorTopic(topic) => handleError(topic, input)
+class ResponderMicroservice extends NioMicroservice[Either[String, MessageEnvelope], MessageEnvelope]("responder") {
+  // strings come from error topics, message envelopes from normal topics, see the routing in
+  // `ResponderMicroservice.payloadFactory` below
+  override def processRecord(input: ConsumerRecord[String, Either[String, MessageEnvelope]]): ProducerRecord[String, MessageEnvelope] = {
+    input.value() match {
+      case Right(envelope) => handleNormal(input.copy(value = envelope))
+      case Left(string) => handleError(input.copy(value = string))
     }
   }
 
-  def handleNormal(topic: String, record: ConsumerRecord[String, Array[Byte]]): ProducerRecord[String, Array[Byte]] = {
-    // TODO: decide on what data should be included here
-    //  also, the source of `record`s here is message-signer right now, so we lose the context - should something be
-    //  done about that?
+  private val normalHint = 0
+
+  def handleNormal(record: ConsumerRecord[String, MessageEnvelope]): ProducerRecord[String, MessageEnvelope] = {
+    val response: JValue = Try(record.value().getContext[JValue]("configuredResponse"))
+      .getOrElse(JsonMethods.parse("""{"message": "your request has been submitted"}"""))
+
+    // nobody's gonna use this packet in this service, so we can recycle it for our purposes
+    val upp = record.value().ubirchPacket
+    upp.setHint(normalHint)
+    upp.setPayload(JsonMethods.asJsonNode(response))
+
     record.toProducerRecord(
       topic = onlyOutputTopic,
-      value = """{"message": "your request has been submitted"}""".getBytes(UTF_8)
+      value = MessageEnvelope(upp)
     )
   }
 
-  def handleError(topic: String, record: ConsumerRecord[String, Array[Byte]]): ProducerRecord[String, Array[Byte]] = {
+  private val errorUUID = UUID.fromString("deaddead-dead-dead-dead-deaddeaddead")
+  private val errorHint = 0
+
+  /** Tries to parse json and if that fails, represents input as json string */
+  private def errorPayload(raw: String): JsonNode = {
+    Try(JsonMethods.asJsonNode(JsonMethods.parse(raw))).getOrElse {
+      JsonMethods.asJsonNode(JString(raw))
+    }
+  }
+
+  def handleError(record: ConsumerRecord[String, String]): ProducerRecord[String, MessageEnvelope] = {
     val headers = record.headersScala
     logger.debug(s"record headers: ${record.headersScala}")
     headers.get("http-status-code") match {
       // Special handling for unauthorized, because we don't handle that one via NioMicroservice error handling
       // (Q: maybe we should? but that would prevent us to easily do something with unauthorized, but otherwise valid
       // packets)
-      case Some("401") => record.toProducerRecord(
-        topic = onlyOutputTopic,
-        value = stringifyException(UnauthorizedException, record.key()).getBytes(UTF_8)
-      )
+      case Some("401") =>
+        val p = errorPayload(stringifyException(UnauthorizedException, record.key()))
+        val upp = new ProtocolMessage(ProtocolMessage.SIGNED, errorUUID, errorHint, p)
+        record.toProducerRecord(
+          topic = onlyOutputTopic,
+          value = MessageEnvelope(upp)
+        )
       case None =>
         logger.warn("Someone's not using NioMicroservice and forgot to attach `http-status-code` header to their " +
           s"error message. Message: [requestId = ${record.key()}, headers = $headers]")
+
+        val p = errorPayload(record.value())
+        val upp = new ProtocolMessage(ProtocolMessage.SIGNED, errorUUID, errorHint, p)
         val httpStatusCodeHeader = new RecordHeader("http-status-code", "500".getBytes(UTF_8))
         record.toProducerRecord(
           topic = onlyOutputTopic,
-          headers = (record.headers().toArray :+ httpStatusCodeHeader).toIterable.asJava
+          headers = (record.headers().toArray :+ httpStatusCodeHeader).toIterable.asJava,
+          value = MessageEnvelope(upp)
         )
-      case _ => record.toProducerRecord(onlyOutputTopic)
+      case _ =>
+        val p = errorPayload(record.value())
+        val upp = new ProtocolMessage(ProtocolMessage.SIGNED, errorUUID, errorHint, p)
+        record.toProducerRecord(onlyOutputTopic, value = MessageEnvelope(upp))
     }
   }
 }
@@ -70,4 +101,13 @@ object ResponderMicroservice {
 
   object UnauthorizedException extends Exception("Unauthorized!")
 
+  implicit val payloadFactory: KafkaPayloadFactory[Either[String, MessageEnvelope]] = { context =>
+    val NormalTopic = topicMatcher(context.config.getStringList("normal-input-topics").asScala)
+    val ErrorTopic = topicMatcher(context.config.getStringList("error-input-topics").asScala)
+
+    KafkaPayload.topicBasedEitherKafkaPayload {
+      case NormalTopic(_) => Right(())
+      case ErrorTopic(_) => Left(())
+    }
+  }
 }
