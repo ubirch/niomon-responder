@@ -28,7 +28,11 @@ class ResponderMicroservice extends NioMicroservice[Either[String, MessageEnvelo
     }
   }
 
+  private val normalUuid = UUID.fromString(config.getString("uuid.normal"))
+  private val errorUuid = UUID.fromString(config.getString("uuid.error"))
+
   private val normalHint = 0
+  private val errorHint = 0
 
   def handleNormal(record: ConsumerRecord[String, MessageEnvelope]): ProducerRecord[String, MessageEnvelope] = {
     val response: JValue = Try(record.value().getContext[JValue]("configuredResponse"))
@@ -37,6 +41,7 @@ class ResponderMicroservice extends NioMicroservice[Either[String, MessageEnvelo
     // nobody's gonna use this packet in this service, so we can recycle it for our purposes
     val upp = record.value().ubirchPacket
     upp.setHint(normalHint)
+    upp.setUUID(normalUuid)
     upp.setPayload(JsonMethods.asJsonNode(response))
 
     record.toProducerRecord(
@@ -44,9 +49,6 @@ class ResponderMicroservice extends NioMicroservice[Either[String, MessageEnvelo
       value = MessageEnvelope(upp)
     )
   }
-
-  private val errorUUID = UUID.fromString("deaddead-dead-dead-dead-deaddeaddead")
-  private val errorHint = 0
 
   /** Tries to parse json and if that fails, represents input as json string */
   private def errorPayload(raw: String): JsonNode = {
@@ -64,7 +66,7 @@ class ResponderMicroservice extends NioMicroservice[Either[String, MessageEnvelo
       // packets)
       case Some("401") =>
         val p = errorPayload(stringifyException(UnauthorizedException, record.key()))
-        val upp = new ProtocolMessage(ProtocolMessage.SIGNED, errorUUID, errorHint, p)
+        val upp = new ProtocolMessage(ProtocolMessage.SIGNED, errorUuid, errorHint, p)
         record.toProducerRecord(
           topic = onlyOutputTopic,
           value = MessageEnvelope(upp)
@@ -74,7 +76,7 @@ class ResponderMicroservice extends NioMicroservice[Either[String, MessageEnvelo
           s"error message. Message: [requestId = ${record.key()}, headers = $headers]")
 
         val p = errorPayload(record.value())
-        val upp = new ProtocolMessage(ProtocolMessage.SIGNED, errorUUID, errorHint, p)
+        val upp = new ProtocolMessage(ProtocolMessage.SIGNED, errorUuid, errorHint, p)
         val httpStatusCodeHeader = new RecordHeader("http-status-code", "500".getBytes(UTF_8))
         record.toProducerRecord(
           topic = onlyOutputTopic,
@@ -83,7 +85,7 @@ class ResponderMicroservice extends NioMicroservice[Either[String, MessageEnvelo
         )
       case _ =>
         val p = errorPayload(record.value())
-        val upp = new ProtocolMessage(ProtocolMessage.SIGNED, errorUUID, errorHint, p)
+        val upp = new ProtocolMessage(ProtocolMessage.SIGNED, errorUuid, errorHint, p)
         record.toProducerRecord(onlyOutputTopic, value = MessageEnvelope(upp))
     }
   }
