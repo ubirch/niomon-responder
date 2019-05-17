@@ -60,6 +60,20 @@
     <build>
         <plugins>
             <plugin>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>2.6</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <addClasspath>true</addClasspath>
+                            <classpathPrefix>lib/</classpathPrefix>
+                            <mainClass>com.ubirch.responder.Main</mainClass>
+                            <useUniqueVersions>false</useUniqueVersions>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+            <plugin>
                 <groupId>net.alchim31.maven</groupId>
                 <artifactId>scala-maven-plugin</artifactId>
             </plugin>
@@ -76,99 +90,12 @@
                 <artifactId>license-maven-plugin</artifactId>
             </plugin>
             <plugin>
-                <artifactId>maven-jar-plugin</artifactId>
-                <version>2.6</version>
-                <configuration>
-                    <archive>
-                        <manifest>
-                            <addClasspath>true</addClasspath>
-                            <classpathPrefix>lib/</classpathPrefix>
-                            <mainClass>com.ubirch.responder.Main</mainClass>
-                            <useUniqueVersions>false</useUniqueVersions>
-                        </manifest>
-                    </archive>
-                </configuration>
-            </plugin>
-            <!-- copy all dependencies into the target/lib dir for our docker image -->
-            <plugin>
                 <artifactId>maven-dependency-plugin</artifactId>
-                <version>2.8</version>
-                <executions>
-                    <!--
-                        Ok, so here we have three different executions: `copy-all-deps` is self-explanatory and is here
-                        only so the things continue to work locally. The two other - `copy-third-party-deps` and
-                        `copy-project-deps` create folders with respectively third- and first-party dependencies.
-                        This is done, so they can be COPYied into a docker image in two steps - first-party dependencies
-                        are often recomplied, and if all the dependencies would be added together that would ruin
-                        docker caching mechanisms.
-                    -->
-                    <execution>
-                        <id>copy-all-deps</id>
-                        <phase>prepare-package</phase>
-                        <goals>
-                            <goal>copy-dependencies</goal>
-                        </goals>
-                        <configuration>
-                            <overWriteReleases>false</overWriteReleases>
-                            <includeScope>runtime</includeScope>
-                            <outputDirectory>${project.build.directory}/lib</outputDirectory>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>copy-third-party-deps</id>
-                        <phase>prepare-package</phase>
-                        <goals>
-                            <goal>copy-dependencies</goal>
-                        </goals>
-                        <configuration>
-                            <overWriteReleases>false</overWriteReleases>
-                            <includeScope>runtime</includeScope>
-                            <outputDirectory>${project.build.directory}/third-party-lib</outputDirectory>
-                            <excludeArtifactIds>${project-libs}</excludeArtifactIds>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>copy-project-deps</id>
-                        <phase>prepare-package</phase>
-                        <goals>
-                            <goal>copy-dependencies</goal>
-                        </goals>
-                        <configuration>
-                            <overWriteReleases>false</overWriteReleases>
-                            <includeScope>runtime</includeScope>
-                            <outputDirectory>${project.build.directory}/project-lib</outputDirectory>
-                            <includeArtifactIds>${project-libs}</includeArtifactIds>
-                        </configuration>
-                    </execution>
-                </executions>
             </plugin>
             <!-- create and/or push the created docker image -->
             <plugin>
                 <groupId>com.spotify</groupId>
                 <artifactId>dockerfile-maven-plugin</artifactId>
-                <version>1.4.4</version>
-                <executions>
-                    <execution>
-                        <id>default</id>
-                        <goals>
-                            <goal>build</goal>
-                            <goal>push</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <buildDirectory>${project.build.outputDirectory}</buildDirectory>
-                    <repository>ubirch/${project.artifactId}</repository>
-                    <tag>${build.number}</tag>
-                    <buildArgs>
-                        <VERSION>${project.version}</VERSION>
-                        <BUILD>${build.number}</BUILD>
-                        <SERVICE_NAME>${project.name}</SERVICE_NAME>
-                        <THIRD_PARTY_LIB>target/third-party-lib</THIRD_PARTY_LIB>
-                        <PROJECT_LIB>target/project-lib</PROJECT_LIB>
-                        <JAR_FILE>target/${project.build.finalName}.${project.packaging}</JAR_FILE>
-                    </buildArgs>
-                </configuration>
             </plugin>
             <!-- for mvn deploy to work, disable the default deploy plugin -->
             <plugin>
