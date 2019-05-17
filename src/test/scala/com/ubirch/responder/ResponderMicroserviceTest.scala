@@ -54,6 +54,6 @@ class ResponderMicroserviceTest extends FlatSpec with Matchers with BeforeAndAft
   override def afterAll(): Unit = {
     EmbeddedKafka.stop()
     implicit val ec = ExecutionContext.global
-    control.drainAndShutdown()
+    val _ = control.drainAndShutdown()
   }
 }
