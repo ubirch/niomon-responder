@@ -92,13 +92,13 @@ class ResponderMicroservice extends NioMicroservice[Either[String, MessageEnvelo
 }
 
 object ResponderMicroservice {
+  private class TopicSet(set: Set[String]) {
+    def unapply(x: String): Option[String] = Some(x).filter(set.contains)
+  }
+
   private def topicMatcher(topics: Iterable[String]) = {
     val set = topics.toSet
-    object TopicSet {
-      def unapply(x: String): Option[String] = Some(x).filter(set.contains)
-    }
-
-    TopicSet
+    new TopicSet(set)
   }
 
   object UnauthorizedException extends Exception("Unauthorized!")
