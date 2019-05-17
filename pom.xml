@@ -92,19 +92,13 @@
             <plugin>
                 <artifactId>maven-dependency-plugin</artifactId>
             </plugin>
-            <!-- create and/or push the created docker image -->
             <plugin>
                 <groupId>com.spotify</groupId>
                 <artifactId>dockerfile-maven-plugin</artifactId>
             </plugin>
-            <!-- for mvn deploy to work, disable the default deploy plugin -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-deploy-plugin</artifactId>
-                <version>2.8.2</version>
-                <configuration>
-                    <skip>true</skip>
-                </configuration>
             </plugin>
             <!-- override scalastyle checks due to parser bug: https://github.com/scala-ide/scalariform/issues/217 -->
             <plugin>
