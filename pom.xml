@@ -45,10 +45,6 @@
         <url>https://ubirch.com/</url>
     </organization>
 
-    <properties>
-        <build.number>${timestamp}-dev</build.number>
-    </properties>
-
     <dependencies>
         <dependency>
             <groupId>ubirch</groupId>
