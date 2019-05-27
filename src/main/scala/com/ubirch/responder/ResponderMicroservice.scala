@@ -5,7 +5,7 @@ import java.util.UUID
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.ubirch.kafka._
-import com.ubirch.niomon.base.NioMicroservice
+import com.ubirch.niomon.base.{NioMicroservice, NioMicroserviceLogic}
 import com.ubirch.niomon.util.{KafkaPayload, KafkaPayloadFactory}
 import com.ubirch.protocol.ProtocolMessage
 import com.ubirch.responder.ResponderMicroservice._
@@ -18,7 +18,7 @@ import org.json4s.jackson.JsonMethods
 import scala.collection.JavaConverters._
 import scala.util.Try
 
-class ResponderMicroservice extends NioMicroservice[Either[String, MessageEnvelope], MessageEnvelope]("responder") {
+class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvelope], MessageEnvelope]) extends NioMicroserviceLogic(runtime) {
   // strings come from error topics, message envelopes from normal topics, see the routing in
   // `ResponderMicroservice.payloadFactory` below
   override def processRecord(input: ConsumerRecord[String, Either[String, MessageEnvelope]]): ProducerRecord[String, MessageEnvelope] = {
@@ -92,6 +92,9 @@ class ResponderMicroservice extends NioMicroservice[Either[String, MessageEnvelo
 }
 
 object ResponderMicroservice {
+  def apply(runtime: NioMicroservice[Either[String, MessageEnvelope], MessageEnvelope]): ResponderMicroservice =
+    new ResponderMicroservice(runtime)
+
   private class TopicSet(set: Set[String]) {
     def unapply(x: String): Option[String] = Some(x).filter(set.contains)
   }

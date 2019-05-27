@@ -51,6 +51,12 @@
             <artifactId>microservice-base</artifactId>
             <version>1.0.0</version>
         </dependency>
+        <dependency>
+            <groupId>ubirch</groupId>
+            <artifactId>microservice-base-mock</artifactId>
+            <version>1.0.0</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
