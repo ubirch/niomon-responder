@@ -21,3 +21,7 @@
 ---
 
 {{ template "niomon.service" $deployment }}
+
+---
+
+{{ template "niomon.prometheus.monitor" $deployment}}
