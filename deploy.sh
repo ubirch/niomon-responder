@@ -34,7 +34,7 @@ if [[ -z "$1" ]]; then
 fi
 
 UBIRCH_ENV=$1
-VALUES_FILE="./niomon/values.${UBIRCH_ENV}.yaml"
+VALUES_FILE="./${HELM_PROJECT_NAME}/values.${UBIRCH_ENV}.yaml"
 shift
 
 # we allow errors here, because it's normal for the delete command to fail, ex. it's the first time we're deploying
