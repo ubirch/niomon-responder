@@ -17,9 +17,9 @@ class ResponderMicroserviceTest extends FlatSpec with Matchers {
 
   import ResponderMicroservice.payloadFactory
   val microservice = NioMicroserviceMock(ResponderMicroservice(_))
-  microservice.config = ConfigFactory.load().getConfig("responder")
+  microservice.config = ConfigFactory.load().getConfig("niomon-responder")
   microservice.outputTopics = Map("default" -> "out")
-  microservice.name = "responder"
+  microservice.name = "niomon-responder"
   import microservice.kafkaMocks._
 
 
@@ -43,7 +43,7 @@ class ResponderMicroserviceTest extends FlatSpec with Matchers {
   it should "accept non-MessageEnvelope messages on the error topic" in {
     publishStringMessageToKafka("error", microservice.stringifyException(new RuntimeException("foo"), "key"))
     val res = consumeFirstMessageFrom[MessageEnvelope]("out")
-    res.ubirchPacket.getPayload.toString should equal ("""{"error":"RuntimeException: foo","causes":[],"microservice":"responder","requestId":"key"}""")
+    res.ubirchPacket.getPayload.toString should equal ("""{"error":"RuntimeException: foo","causes":[],"microservice":"niomon-responder","requestId":"key"}""")
     res.ubirchPacket.getUUID should equal (UUID.fromString("deaddead-dead-dead-dead-deaddeaddead"))
   }
 }

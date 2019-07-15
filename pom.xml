@@ -19,12 +19,11 @@
          xmlns="http://maven.apache.org/POM/4.0.0"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <parent>
-        <groupId>com.ubirch</groupId>
-        <artifactId>niomon-base</artifactId>
+        <groupId>com.ubirch.niomon</groupId>
+        <artifactId>parent</artifactId>
         <version>1.0.1-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
-
     <artifactId>responder</artifactId>
     <version>1.0.1-SNAPSHOT</version>
     <packaging>jar</packaging>
@@ -47,13 +46,13 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.ubirch</groupId>
-            <artifactId>microservice-base</artifactId>
+            <groupId>com.ubirch.niomon</groupId>
+            <artifactId>foundation</artifactId>
             <version>1.0.1-SNAPSHOT</version>
         </dependency>
         <dependency>
-            <groupId>com.ubirch</groupId>
-            <artifactId>microservice-base-mock</artifactId>
+            <groupId>com.ubirch.niomon</groupId>
+            <artifactId>foundation-mock</artifactId>
             <version>1.0.1-SNAPSHOT</version>
             <scope>test</scope>
         </dependency>
@@ -69,7 +68,7 @@
                         <manifest>
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>lib/</classpathPrefix>
-                            <mainClass>com.ubirch.responder.Main</mainClass>
+                            <mainClass>com.ubirch.niomon-responder.Main</mainClass>
                             <useUniqueVersions>false</useUniqueVersions>
                         </manifest>
                     </archive>

@@ -1,4 +1,4 @@
-{{- define "responder.env" -}}
+{{- define "niomon-responder.env" -}}
 - name: KAFKA_TOPIC_IN_SUCCESS
   value: "json.to.sign"
 - name: KAFKA_TOPIC_IN_ERROR
@@ -11,10 +11,10 @@
   value: "{{ .Values.serverUuid }}"
 {{- end -}}
 
-{{- $deployment := (dict "envStr" (include "responder.env" .)) -}}
+{{- $deployment := (dict "envStr" (include "niomon-responder.env" .)) -}}
 
 {{- $_ := set $deployment "Root" . -}}
-{{- $_ := set $deployment "name" "responder" -}}
+{{- $_ := set $deployment "name" "niomon-responder" -}}
 
 {{ template "niomon.deployment" $deployment }}
 

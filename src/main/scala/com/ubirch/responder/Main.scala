@@ -5,6 +5,6 @@ import ResponderMicroservice._
 
 object Main {
   def main(args: Array[String]): Unit = {
-    val _ = NioMicroserviceLive("responder", ResponderMicroservice(_)).runUntilDoneAndShutdownProcess
+    val _ = NioMicroserviceLive("niomon-responder", ResponderMicroservice(_)).runUntilDoneAndShutdownProcess
   }
 }
