@@ -4,7 +4,9 @@ set -e
 # this works as long as the executed script is not a symlink
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 cd ${DIR}
-cd ./helm/
+cd ./target/deploy/
+
+ls
 
 if [[ "$(ls | wc -l)" != "1" ]]; then
   echo "helm folder must contain only one project!"
