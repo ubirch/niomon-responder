@@ -96,7 +96,7 @@
                         <manifest>
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>lib/</classpathPrefix>
-                            <mainClass>com.ubirch.niomon-responder.Main</mainClass>
+                            <mainClass>com.ubirch.responder.Main</mainClass>
                             <useUniqueVersions>false</useUniqueVersions>
                         </manifest>
                     </archive>

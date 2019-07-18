@@ -14,7 +14,7 @@
 {{- $deployment := (dict "envStr" (include "niomon-responder.env" .)) -}}
 
 {{- $_ := set $deployment "Root" . -}}
-{{- $_ := set $deployment "name" "niomon-responder" -}}
+{{- $_ := set $deployment "name" "responder" -}}
 
 {{ template "niomon.deployment" $deployment }}
 
