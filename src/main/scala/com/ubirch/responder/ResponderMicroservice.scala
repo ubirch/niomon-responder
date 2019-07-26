@@ -8,7 +8,8 @@ import com.ubirch.kafka._
 import com.ubirch.niomon.base.{NioMicroservice, NioMicroserviceLogic}
 import com.ubirch.niomon.util.{KafkaPayload, KafkaPayloadFactory}
 import com.ubirch.protocol.ProtocolMessage
-import com.ubirch.responder.ResponderMicroservice._
+import com.ubirch.responder.ResponderMicroservice.UnauthorizedException
+import net.logstash.logback.argument.StructuredArguments.v
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.header.internals.RecordHeader
@@ -59,7 +60,7 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
 
   def handleError(record: ConsumerRecord[String, String]): ProducerRecord[String, MessageEnvelope] = {
     val headers = record.headersScala
-    logger.debug(s"record headers: ${record.headersScala}")
+    logger.debug(s"record headers: ${record.headersScala}", v("requestId", record.key()))
     headers.get("http-status-code") match {
       // Special handling for unauthorized, because we don't handle that one via NioMicroservice error handling
       // (Q: maybe we should? but that would prevent us to easily do something with unauthorized, but otherwise valid
@@ -73,7 +74,7 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
         )
       case None =>
         logger.warn("Someone's not using NioMicroservice and forgot to attach `http-status-code` header to their " +
-          s"error message. Message: [requestId = ${record.key()}, headers = $headers]")
+          s"error message. Message: [requestId = ${v("requestId", record.key())}, headers = ${v("headers", headers.asJava)}]")
 
         val p = errorPayload(record.value())
         val upp = new ProtocolMessage(ProtocolMessage.SIGNED, errorUuid, errorHint, p)
