@@ -73,7 +73,7 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
           value = MessageEnvelope(upp)
         )
       case None =>
-        logger.warn("Someone's not using NioMicroservice and forgot to attach `http-status-code` header to their " +
+        logger.warn("someone's not using NioMicroservice and forgot to attach `http-status-code` header to their " +
           s"error message. Message: [requestId = ${v("requestId", record.key())}, headers = ${v("headers", headers.asJava)}]")
 
         val p = errorPayload(record.value())
