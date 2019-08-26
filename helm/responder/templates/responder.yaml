@@ -1,10 +1,10 @@
 {{- define "niomon-responder.env" -}}
 - name: KAFKA_TOPIC_IN_SUCCESS
-  value: "json.to.sign"
+  value: "ubirch-common-message-json"
 - name: KAFKA_TOPIC_IN_ERROR
-  value: "niomon.error"
+  value: "ubirch-niomon-error-json"
 - name: KAFKA_TOPIC_OUT
-  value: "niomon.response"
+  value: "ubirch-common-response-json"
 - name: UUID_NORMAL
   value: "{{ .Values.serverUuid }}"
 - name: UUID_ERROR
@@ -15,6 +15,7 @@
 
 {{- $_ := set $deployment "Root" . -}}
 {{- $_ := set $deployment "name" "responder" -}}
+  {{- $_ := set $deployment "replicas" .Values.responder.replicas -}}
 
 {{ template "niomon.deployment" $deployment }}
 
