@@ -35,7 +35,7 @@
         </encoder>
     </appender>
 
-    <logger name="com.ubirch" level="INFO"/>
+    <logger name="com.ubirch" level="WARN"/>
 
     <logger name="org.apache.kafka" level="WARN"/>
     <logger name="akka.actor.TimerScheduler" level="WARN"/>
