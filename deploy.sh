@@ -8,7 +8,7 @@ cd ./target/deploy/
 
 ls
 
-if [[ "$(ls | wc -l)" != "1" ]]; then
+if [[ "$(ls | wc -l|sed -e 's/^[[:space:]]*//')" != "1" ]]; then
   echo "helm folder must contain only one project!"
   exit 1
 fi
