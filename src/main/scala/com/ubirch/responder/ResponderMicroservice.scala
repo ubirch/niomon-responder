@@ -96,6 +96,7 @@ object ResponderMicroservice {
   def apply(runtime: NioMicroservice[Either[String, MessageEnvelope], MessageEnvelope]): ResponderMicroservice =
     new ResponderMicroservice(runtime)
 
+  /** helper to match a string against set contents using case syntax */
   private class TopicSet(set: Set[String]) {
     def unapply(x: String): Option[String] = Some(x).filter(set.contains)
   }
