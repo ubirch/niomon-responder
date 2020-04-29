@@ -6,6 +6,7 @@ import java.util.UUID
 import com.fasterxml.jackson.databind.JsonNode
 import com.ubirch.kafka._
 import com.ubirch.niomon.base.{NioMicroservice, NioMicroserviceLogic}
+import com.ubirch.niomon.util.EnrichedMap.toEnrichedMap
 import com.ubirch.niomon.util.{KafkaPayload, KafkaPayloadFactory}
 import com.ubirch.protocol.ProtocolMessage
 import com.ubirch.responder.ResponderMicroservice.UnauthorizedException
@@ -60,8 +61,10 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
 
   def handleError(record: ConsumerRecord[String, String]): ProducerRecord[String, MessageEnvelope] = {
     val headers = record.headersScala
-    logger.debug(s"record headers: ${record.headersScala}", v("requestId", record.key()))
-    headers.get("http-status-code") match {
+
+    logger.debug(s"record headers: $headers", v("requestId", record.key()))
+
+    headers.CaseInsensitive.get("http-status-code") match {
       // Special handling for unauthorized, because we don't handle that one via NioMicroservice error handling
       // (Q: maybe we should? but that would prevent us to easily do something with unauthorized, but otherwise valid
       // packets)
