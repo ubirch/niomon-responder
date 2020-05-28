@@ -4,17 +4,19 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.util.UUID
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.BinaryNode
 import com.ubirch.kafka._
 import com.ubirch.niomon.base.{NioMicroservice, NioMicroserviceLogic}
 import com.ubirch.niomon.util.EnrichedMap.toEnrichedMap
 import com.ubirch.niomon.util.{KafkaPayload, KafkaPayloadFactory}
 import com.ubirch.protocol.ProtocolMessage
+import com.ubirch.protocol.codec.UUIDUtil
 import com.ubirch.responder.ResponderMicroservice.UnauthorizedException
 import net.logstash.logback.argument.StructuredArguments.v
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.header.internals.RecordHeader
-import org.json4s.JsonAST.{JString, JValue}
+import org.json4s.JsonAST.JString
 import org.json4s.jackson.JsonMethods
 
 import scala.collection.JavaConverters._
@@ -37,18 +39,17 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
   private val errorHint = 0
 
   def handleNormal(record: ConsumerRecord[String, MessageEnvelope]): ProducerRecord[String, MessageEnvelope] = {
-    val response: JValue = Try(record.value().getContext[JValue]("configuredResponse"))
-      .getOrElse(JsonMethods.parse("""{"message": "your request has been submitted"}"""))
-
-    // nobody's gonna use this packet in this service, so we can recycle it for our purposes
-    val upp = record.value().ubirchPacket
-    upp.setHint(normalHint)
-    upp.setUUID(normalUuid)
-    upp.setPayload(JsonMethods.asJsonNode(response))
+    val requestUPP = record.value().ubirchPacket
+    val responseUPP = new ProtocolMessage()
+    responseUPP.setVersion(ProtocolMessage.ubirchProtocolVersion)
+    responseUPP.setUUID(normalUuid)
+    responseUPP.setChain(requestUPP.getSignature)
+    responseUPP.setHint(normalHint)
+    responseUPP.setPayload(BinaryNode.valueOf(UUIDUtil.uuidToBytes(UUID.fromString(record.key()))))
 
     record.toProducerRecord(
       topic = onlyOutputTopic,
-      value = MessageEnvelope(upp)
+      value = MessageEnvelope(requestUPP)
     )
   }
 
