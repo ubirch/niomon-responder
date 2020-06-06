@@ -1,12 +1,14 @@
 package com.ubirch.responder
 
-import java.util.UUID
+import java.util.{Base64, UUID}
 
 import com.typesafe.config.ConfigFactory
 import com.ubirch.kafka.MessageEnvelope
 import com.ubirch.niomon.base.NioMicroserviceMock
 import com.ubirch.niomon.util.KafkaPayload
 import com.ubirch.protocol.ProtocolMessage
+import com.ubirch.protocol.codec.UUIDUtil
+import org.apache.kafka.clients.producer.ProducerRecord
 import org.json4s.JsonAST.{JObject, JString}
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -28,16 +30,22 @@ class ResponderMicroserviceTest extends FlatSpec with Matchers {
     val _ = consumeFirstMessageFrom[MessageEnvelope]("out")
   }
 
-  it should "respond with the response from context, if the message is successful" in {
-    publishToKafka("success", MessageEnvelope(new ProtocolMessage(), JObject("configuredResponse" -> JString("hello!"))))
+  it should "respond with the request id, if the message is successful and request id has been set" in {
+    val requestId = UUID.randomUUID()
+    publishToKafka(new ProducerRecord("success", requestId.toString, MessageEnvelope(new ProtocolMessage(), JObject("configuredResponse" -> JString("hello!")))))
     val res = consumeFirstMessageFrom[MessageEnvelope]("out")
-    res.ubirchPacket.getPayload.asText() should equal ("hello!")
+    //We have to decode it as the helper here to get the payload returns a JsonNode and not a BinaryNode
+    val returnedUUID = UUIDUtil.bytesToUUID(Base64.getDecoder.decode(res.ubirchPacket.getPayload.asText()))
+    returnedUUID should equal (requestId)
   }
 
   it should "use a default response if configuredResponse is missing from the context" in {
-    publishToKafka("success", MessageEnvelope(new ProtocolMessage()))
+    val requestId = UUID.randomUUID()
+    publishToKafka(new ProducerRecord("success", requestId.toString, MessageEnvelope(new ProtocolMessage())))
     val res = consumeFirstMessageFrom[MessageEnvelope]("out")
-    res.ubirchPacket.getPayload.toString should equal ("""{"message":"your request has been submitted"}""")
+    //We have to decode it as the helper here to get the payload returns a JsonNode and not a BinaryNode
+    val returnedUUID = UUIDUtil.bytesToUUID(Base64.getDecoder.decode(res.ubirchPacket.getPayload.asText()))
+    returnedUUID should equal (requestId)
   }
 
   it should "accept non-MessageEnvelope messages on the error topic" in {

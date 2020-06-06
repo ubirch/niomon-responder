@@ -39,18 +39,33 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
   private val errorHint = 0
 
   def handleNormal(record: ConsumerRecord[String, MessageEnvelope]): ProducerRecord[String, MessageEnvelope] = {
-    val requestUPP = record.value().ubirchPacket
-    val responseUPP = new ProtocolMessage()
-    responseUPP.setVersion(ProtocolMessage.ubirchProtocolVersion)
-    responseUPP.setUUID(normalUuid)
-    responseUPP.setChain(requestUPP.getSignature)
-    responseUPP.setHint(normalHint)
-    responseUPP.setPayload(BinaryNode.valueOf(UUIDUtil.uuidToBytes(UUID.fromString(record.key()))))
 
-    record.toProducerRecord(
-      topic = onlyOutputTopic,
-      value = MessageEnvelope(requestUPP)
-    )
+    val tryResponseUPP = for {
+      requestId <- Try(record.key())
+      requestUPP <- Try(record.value().ubirchPacket)
+      payload <- Try(BinaryNode.valueOf(UUIDUtil.uuidToBytes(UUID.fromString(requestId))))
+    } yield {
+      val responseUPP = new ProtocolMessage()
+      responseUPP.setVersion(ProtocolMessage.ubirchProtocolVersion)
+      responseUPP.setUUID(normalUuid)
+      responseUPP.setChain(requestUPP.getSignature)
+      responseUPP.setHint(normalHint)
+      responseUPP.setPayload(payload)
+      responseUPP
+    }
+
+    tryResponseUPP.map { upp =>
+      record.toProducerRecord(
+        topic = onlyOutputTopic,
+        value = MessageEnvelope(upp)
+      )
+    }.getOrElse {
+      handleError(record
+        .withExtraHeaders("http-status-code" -> "500")
+        .copy(value = "Error creating response, but it is likely the message was accepted.")
+      )
+    }
+
   }
 
   /** Tries to parse json and if that fails, represents input as json string */
