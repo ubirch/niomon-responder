@@ -4,17 +4,19 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.util.UUID
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.BinaryNode
 import com.ubirch.kafka._
 import com.ubirch.niomon.base.{NioMicroservice, NioMicroserviceLogic}
 import com.ubirch.niomon.util.EnrichedMap.toEnrichedMap
 import com.ubirch.niomon.util.{KafkaPayload, KafkaPayloadFactory}
 import com.ubirch.protocol.ProtocolMessage
+import com.ubirch.protocol.codec.UUIDUtil
 import com.ubirch.responder.ResponderMicroservice.UnauthorizedException
 import net.logstash.logback.argument.StructuredArguments.v
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.header.internals.RecordHeader
-import org.json4s.JsonAST.{JString, JValue}
+import org.json4s.JsonAST.JString
 import org.json4s.jackson.JsonMethods
 
 import scala.collection.JavaConverters._
@@ -37,19 +39,33 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
   private val errorHint = 0
 
   def handleNormal(record: ConsumerRecord[String, MessageEnvelope]): ProducerRecord[String, MessageEnvelope] = {
-    val response: JValue = Try(record.value().getContext[JValue]("configuredResponse"))
-      .getOrElse(JsonMethods.parse("""{"message": "your request has been submitted"}"""))
 
-    // nobody's gonna use this packet in this service, so we can recycle it for our purposes
-    val upp = record.value().ubirchPacket
-    upp.setHint(normalHint)
-    upp.setUUID(normalUuid)
-    upp.setPayload(JsonMethods.asJsonNode(response))
+    val tryResponseUPP = for {
+      requestId <- Try(record.key())
+      requestUPP <- Try(record.value().ubirchPacket)
+      payload <- Try(BinaryNode.valueOf(UUIDUtil.uuidToBytes(UUID.fromString(requestId))))
+    } yield {
+      val responseUPP = new ProtocolMessage()
+      responseUPP.setVersion(ProtocolMessage.ubirchProtocolVersion)
+      responseUPP.setUUID(normalUuid)
+      responseUPP.setChain(requestUPP.getSignature)
+      responseUPP.setHint(normalHint)
+      responseUPP.setPayload(payload)
+      responseUPP
+    }
 
-    record.toProducerRecord(
-      topic = onlyOutputTopic,
-      value = MessageEnvelope(upp)
-    )
+    tryResponseUPP.map { upp =>
+      record.toProducerRecord(
+        topic = onlyOutputTopic,
+        value = MessageEnvelope(upp)
+      )
+    }.getOrElse {
+      handleError(record
+        .withExtraHeaders("http-status-code" -> "500")
+        .copy(value = "Error creating response, but it is likely the message was accepted.")
+      )
+    }
+
   }
 
   /** Tries to parse json and if that fails, represents input as json string */
