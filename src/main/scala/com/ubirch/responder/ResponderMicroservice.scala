@@ -46,7 +46,7 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
       payload <- Try(BinaryNode.valueOf(UUIDUtil.uuidToBytes(UUID.fromString(requestId))))
     } yield {
       val responseUPP = new ProtocolMessage()
-      responseUPP.setVersion(ProtocolMessage.ubirchProtocolVersion)
+      responseUPP.setVersion(requestUPP.getVersion)
       responseUPP.setUUID(normalUuid)
       responseUPP.setChain(requestUPP.getSignature)
       responseUPP.setHint(normalHint)
