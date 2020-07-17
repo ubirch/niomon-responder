@@ -32,7 +32,9 @@ class ResponderMicroserviceTest extends FlatSpec with Matchers {
 
   it should "respond with the request id, if the message is successful and request id has been set" in {
     val requestId = UUID.randomUUID()
-    publishToKafka(new ProducerRecord("success", requestId.toString, MessageEnvelope(new ProtocolMessage(), JObject("configuredResponse" -> JString("hello!")))))
+    val pr = new ProducerRecord[String, MessageEnvelope]("success", MessageEnvelope(new ProtocolMessage(), JObject("configuredResponse" -> JString("hello!"))))
+      .withRequestIdHeader()(requestId.toString)
+    publishToKafka(pr)
     val res = consumeFirstMessageFrom[MessageEnvelope]("out")
     //We have to decode it as the helper here to get the payload returns a JsonNode and not a BinaryNode
     val returnedUUID = UUIDUtil.bytesToUUID(Base64.getDecoder.decode(res.ubirchPacket.getPayload.asText()))
@@ -41,7 +43,7 @@ class ResponderMicroserviceTest extends FlatSpec with Matchers {
 
   it should "use a default response if configuredResponse is missing from the context" in {
     val requestId = UUID.randomUUID()
-    publishToKafka(new ProducerRecord("success", requestId.toString, MessageEnvelope(new ProtocolMessage())))
+    publishToKafka(new ProducerRecord[String, MessageEnvelope]("success", MessageEnvelope(new ProtocolMessage())).withRequestIdHeader()(requestId.toString))
     val res = consumeFirstMessageFrom[MessageEnvelope]("out")
     //We have to decode it as the helper here to get the payload returns a JsonNode and not a BinaryNode
     val returnedUUID = UUIDUtil.bytesToUUID(Base64.getDecoder.decode(res.ubirchPacket.getPayload.asText()))

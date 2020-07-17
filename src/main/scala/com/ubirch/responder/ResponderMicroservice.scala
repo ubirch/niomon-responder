@@ -38,11 +38,11 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
   private val normalHint = 0
   private val errorHint = 0
 
-  def handleNormal(record: ConsumerRecord[String, MessageEnvelope]): ProducerRecord[String, MessageEnvelope] = {
+  def handleNormal(input: ConsumerRecord[String, MessageEnvelope]): ProducerRecord[String, MessageEnvelope] = {
 
     val tryResponseUPP = for {
-      requestId <- Try(record.key())
-      requestUPP <- Try(record.value().ubirchPacket)
+      requestId <- Try(input.requestIdHeader().get)
+      requestUPP <- Try(input.value().ubirchPacket)
       payload <- Try(BinaryNode.valueOf(UUIDUtil.uuidToBytes(UUID.fromString(requestId))))
     } yield {
       val responseUPP = new ProtocolMessage()
@@ -55,12 +55,12 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
     }
 
     tryResponseUPP.map { upp =>
-      record.toProducerRecord(
+      input.toProducerRecord(
         topic = onlyOutputTopic,
         value = MessageEnvelope(upp)
       )
     }.getOrElse {
-      handleError(record
+      handleError(input
         .withExtraHeaders("http-status-code" -> "500")
         .copy(value = "Error creating response, but it is likely the message was accepted.")
       )
@@ -75,38 +75,39 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
     }
   }
 
-  def handleError(record: ConsumerRecord[String, String]): ProducerRecord[String, MessageEnvelope] = {
-    val headers = record.headersScala
+  def handleError(input: ConsumerRecord[String, String]): ProducerRecord[String, MessageEnvelope] = {
+    val headers = input.headersScala
+    val requestId = input.requestIdHeader().orNull
 
-    logger.debug(s"record headers: $headers", v("requestId", record.key()))
+    logger.debug(s"record headers: $headers", v("requestId", requestId))
 
     headers.CaseInsensitive.get("http-status-code") match {
       // Special handling for unauthorized, because we don't handle that one via NioMicroservice error handling
       // (Q: maybe we should? but that would prevent us to easily do something with unauthorized, but otherwise valid
       // packets)
       case Some("401") =>
-        val p = errorPayload(stringifyException(UnauthorizedException, record.key()))
+        val p = errorPayload(stringifyException(UnauthorizedException, requestId))
         val upp = new ProtocolMessage(ProtocolMessage.SIGNED, errorUuid, errorHint, p)
-        record.toProducerRecord(
+        input.toProducerRecord(
           topic = onlyOutputTopic,
           value = MessageEnvelope(upp)
         )
       case None =>
         logger.warn("someone's not using NioMicroservice and forgot to attach `http-status-code` header to their " +
-          s"error message. Message: [requestId = {}, headers = {}]", v("requestId", record.key()), v("headers", headers.asJava))
+          s"error message. Message: [requestId = {}, headers = {}]", v("requestId", requestId), v("headers", headers.asJava))
 
-        val p = errorPayload(record.value())
+        val p = errorPayload(input.value())
         val upp = new ProtocolMessage(ProtocolMessage.SIGNED, errorUuid, errorHint, p)
         val httpStatusCodeHeader = new RecordHeader("http-status-code", "500".getBytes(UTF_8))
-        record.toProducerRecord(
+        input.toProducerRecord(
           topic = onlyOutputTopic,
-          headers = (record.headers().toArray :+ httpStatusCodeHeader).toIterable.asJava,
+          headers = (input.headers().toArray :+ httpStatusCodeHeader).toIterable.asJava,
           value = MessageEnvelope(upp)
         )
       case _ =>
-        val p = errorPayload(record.value())
+        val p = errorPayload(input.value())
         val upp = new ProtocolMessage(ProtocolMessage.SIGNED, errorUuid, errorHint, p)
-        record.toProducerRecord(onlyOutputTopic, value = MessageEnvelope(upp))
+        input.toProducerRecord(onlyOutputTopic, value = MessageEnvelope(upp))
     }
   }
 }
