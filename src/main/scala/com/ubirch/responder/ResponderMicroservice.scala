@@ -25,10 +25,10 @@ import scala.util.Try
 class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvelope], MessageEnvelope]) extends NioMicroserviceLogic(runtime) {
   // strings come from error topics, message envelopes from normal topics, see the routing in
   // `ResponderMicroservice.payloadFactory` below
-  override def processRecord(input: ConsumerRecord[String, Either[String, MessageEnvelope]]): ProducerRecord[String, MessageEnvelope] = {
-    input.value() match {
-      case Right(envelope) => handleNormal(input.copy(value = envelope))
-      case Left(string) => handleError(input.copy(value = string))
+  override def processRecord(record: ConsumerRecord[String, Either[String, MessageEnvelope]]): ProducerRecord[String, MessageEnvelope] = {
+    record.value() match {
+      case Right(envelope) => handleNormal(record.copy(value = envelope))
+      case Left(string) => handleError(record.copy(value = string))
     }
   }
 
@@ -38,11 +38,11 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
   private val normalHint = 0
   private val errorHint = 0
 
-  def handleNormal(input: ConsumerRecord[String, MessageEnvelope]): ProducerRecord[String, MessageEnvelope] = {
+  def handleNormal(record: ConsumerRecord[String, MessageEnvelope]): ProducerRecord[String, MessageEnvelope] = {
 
     val tryResponseUPP = for {
-      requestId <- Try(input.requestIdHeader().get)
-      requestUPP <- Try(input.value().ubirchPacket)
+      requestId <- Try(record.requestIdHeader().get)
+      requestUPP <- Try(record.value().ubirchPacket)
       payload <- Try(BinaryNode.valueOf(UUIDUtil.uuidToBytes(UUID.fromString(requestId))))
     } yield {
       val responseUPP = new ProtocolMessage()
@@ -55,12 +55,12 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
     }
 
     tryResponseUPP.map { upp =>
-      input.toProducerRecord(
+      record.toProducerRecord(
         topic = onlyOutputTopic,
         value = MessageEnvelope(upp)
       )
     }.getOrElse {
-      handleError(input
+      handleError(record
         .withExtraHeaders("http-status-code" -> "500")
         .copy(value = "Error creating response, but it is likely the message was accepted.")
       )
@@ -75,9 +75,9 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
     }
   }
 
-  def handleError(input: ConsumerRecord[String, String]): ProducerRecord[String, MessageEnvelope] = {
-    val headers = input.headersScala
-    val requestId = input.requestIdHeader().orNull
+  def handleError(record: ConsumerRecord[String, String]): ProducerRecord[String, MessageEnvelope] = {
+    val headers = record.headersScala
+    val requestId = record.requestIdHeader().orNull
 
     logger.debug(s"record headers: $headers", v("requestId", requestId))
 
@@ -88,7 +88,7 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
       case Some("401") =>
         val p = errorPayload(stringifyException(UnauthorizedException, requestId))
         val upp = new ProtocolMessage(ProtocolMessage.SIGNED, errorUuid, errorHint, p)
-        input.toProducerRecord(
+        record.toProducerRecord(
           topic = onlyOutputTopic,
           value = MessageEnvelope(upp)
         )
@@ -96,18 +96,18 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
         logger.warn("someone's not using NioMicroservice and forgot to attach `http-status-code` header to their " +
           s"error message. Message: [requestId = {}, headers = {}]", v("requestId", requestId), v("headers", headers.asJava))
 
-        val p = errorPayload(input.value())
+        val p = errorPayload(record.value())
         val upp = new ProtocolMessage(ProtocolMessage.SIGNED, errorUuid, errorHint, p)
         val httpStatusCodeHeader = new RecordHeader("http-status-code", "500".getBytes(UTF_8))
-        input.toProducerRecord(
+        record.toProducerRecord(
           topic = onlyOutputTopic,
-          headers = (input.headers().toArray :+ httpStatusCodeHeader).toIterable.asJava,
+          headers = (record.headers().toArray :+ httpStatusCodeHeader).toIterable.asJava,
           value = MessageEnvelope(upp)
         )
       case _ =>
-        val p = errorPayload(input.value())
+        val p = errorPayload(record.value())
         val upp = new ProtocolMessage(ProtocolMessage.SIGNED, errorUuid, errorHint, p)
-        input.toProducerRecord(onlyOutputTopic, value = MessageEnvelope(upp))
+        record.toProducerRecord(onlyOutputTopic, value = MessageEnvelope(upp))
     }
   }
 }
