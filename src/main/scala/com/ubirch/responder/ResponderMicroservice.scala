@@ -1,6 +1,5 @@
 package com.ubirch.responder
 
-import java.nio.charset.StandardCharsets.UTF_8
 import java.util.UUID
 
 import com.fasterxml.jackson.databind.JsonNode
@@ -15,7 +14,6 @@ import com.ubirch.responder.ResponderMicroservice.UnauthorizedException
 import net.logstash.logback.argument.StructuredArguments.v
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerRecord
-import org.apache.kafka.common.header.internals.RecordHeader
 import org.json4s.JsonAST.JString
 import org.json4s.jackson.JsonMethods
 
@@ -79,6 +77,24 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
     val headers = record.headersScala
     val requestId = record.requestIdHeader().orNull
 
+    val previous = headers.CaseInsensitive.get("previous-microservice")
+      .map(_.split("-")
+        .toList
+        .filter(_.nonEmpty)
+        .flatMap(_.headOption.toList)
+        .map(_.toUpper)
+        .mkString("")
+      ).getOrElse("NU")
+
+    val xcodeHeader = headers.CaseInsensitive.get("x-code")
+        .filter(_.nonEmpty)
+        .map(x => "-" + x)
+        .mkString("")
+
+    def xcode(status: String) = previous + status +  xcodeHeader
+
+    def xpayload = Try(BinaryNode.valueOf(UUIDUtil.uuidToBytes(UUID.fromString(requestId))))
+
     logger.debug(s"record headers: $headers", v("requestId", requestId))
 
     headers.CaseInsensitive.get("http-status-code") match {
@@ -86,28 +102,34 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
       // (Q: maybe we should? but that would prevent us to easily do something with unauthorized, but otherwise valid
       // packets)
       case Some("401") =>
-        val p = errorPayload(stringifyException(UnauthorizedException, requestId))
+
+        val p = xpayload.getOrElse(errorPayload(stringifyException(UnauthorizedException, requestId)))
         val upp = new ProtocolMessage(ProtocolMessage.SIGNED, errorUuid, errorHint, p)
-        record.toProducerRecord(
-          topic = onlyOutputTopic,
-          value = MessageEnvelope(upp)
-        )
+
+        record
+          .toProducerRecord(topic = onlyOutputTopic, value = MessageEnvelope(upp))
+          .withExtraHeaders("x-err"-> xcode("401"))
+
+      case Some(status) =>
+
+        val p = xpayload.getOrElse(errorPayload(record.value()))
+        val upp = new ProtocolMessage(ProtocolMessage.SIGNED, errorUuid, errorHint, p)
+
+        record
+          .toProducerRecord(onlyOutputTopic, value = MessageEnvelope(upp))
+          .withExtraHeaders("x-err"-> xcode(status))
+
       case None =>
         logger.warn("someone's not using NioMicroservice and forgot to attach `http-status-code` header to their " +
           s"error message. Message: [requestId = {}, headers = {}]", v("requestId", requestId), v("headers", headers.asJava))
 
-        val p = errorPayload(record.value())
+        val p = xpayload.getOrElse(errorPayload(record.value()))
         val upp = new ProtocolMessage(ProtocolMessage.SIGNED, errorUuid, errorHint, p)
-        val httpStatusCodeHeader = new RecordHeader("http-status-code", "500".getBytes(UTF_8))
-        record.toProducerRecord(
-          topic = onlyOutputTopic,
-          headers = (record.headers().toArray :+ httpStatusCodeHeader).toIterable.asJava,
-          value = MessageEnvelope(upp)
-        )
-      case _ =>
-        val p = errorPayload(record.value())
-        val upp = new ProtocolMessage(ProtocolMessage.SIGNED, errorUuid, errorHint, p)
-        record.toProducerRecord(onlyOutputTopic, value = MessageEnvelope(upp))
+
+        record
+          .toProducerRecord(onlyOutputTopic, value = MessageEnvelope(upp))
+          .withExtraHeaders("http-status-code" -> "500", "x-err"-> xcode("500"))
+
     }
   }
 }
@@ -126,7 +148,7 @@ object ResponderMicroservice {
     new TopicSet(set)
   }
 
-  object UnauthorizedException extends Exception("Unauthorized!")
+  case object UnauthorizedException extends Exception("Unauthorized!")
 
   implicit val payloadFactory: KafkaPayloadFactory[Either[String, MessageEnvelope]] = { context =>
     val NormalTopic = topicMatcher(context.config.getStringList("normal-input-topics").asScala)
