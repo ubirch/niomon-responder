@@ -87,9 +87,9 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
       ).getOrElse("NU")
 
     val xcodeHeader = headers.CaseInsensitive.get("x-code")
-        .filter(_.nonEmpty)
-        .map(x => "-" + x)
-        .mkString("")
+      .filter(_.nonEmpty)
+      .map(x => "-" + x)
+      .getOrElse("-0000")
 
     def xcode(status: String) = previous + status +  xcodeHeader
 
