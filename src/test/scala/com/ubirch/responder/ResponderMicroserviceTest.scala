@@ -1,7 +1,6 @@
 package com.ubirch.responder
 
 import java.util.{Base64, UUID}
-
 import com.typesafe.config.ConfigFactory
 import com.ubirch.kafka.MessageEnvelope
 import com.ubirch.niomon.base.NioMicroserviceMock
@@ -39,7 +38,9 @@ class ResponderMicroserviceTest extends FlatSpec with Matchers {
     //We have to decode it as the helper here to get the payload returns a JsonNode and not a BinaryNode
     val payload = Base64.getDecoder.decode(res.ubirchPacket.getPayload.asText())
     payload.size should equal(32)
+    assert(payload.slice(16, payload.size) sameElements Array.fill[Byte](16)(0))
     val returnedUUID = UUIDUtil.bytesToUUID(payload)
+    UUIDUtil.uuidToBytes(returnedUUID).length should equal(16)
     returnedUUID should equal (requestId)
   }
 
