@@ -36,12 +36,22 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
   private val normalHint = 0
   private val errorHint = 0
 
+  private final val payloadPadding = Array.fill[Byte](16)(0)
+
   def handleNormal(record: ConsumerRecord[String, MessageEnvelope]): ProducerRecord[String, MessageEnvelope] = {
 
     val tryResponseUPP = for {
-      requestId <- Try(record.requestIdHeader().get)
+      //We are adding 16 bytes in zeros to have a fixed payload of 32 bytes that
+      //will allow clients to better read the signatures when ecdsa is applied with
+      //raw signatures
+      requestIdAsBytesWithPadding <- Try(record.requestIdHeader().get)
+        .map(UUID.fromString)
+        .map(UUIDUtil.uuidToBytes)
+        .map(r => Array.concat(r, payloadPadding))
+
       requestUPP <- Try(record.value().ubirchPacket)
-      payload <- Try(BinaryNode.valueOf(UUIDUtil.uuidToBytes(UUID.fromString(requestId))))
+      payload <- Try(BinaryNode.valueOf(requestIdAsBytesWithPadding))
+
     } yield {
       val responseUPP = new ProtocolMessage()
       responseUPP.setVersion(requestUPP.getVersion)

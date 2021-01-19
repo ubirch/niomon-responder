@@ -37,7 +37,9 @@ class ResponderMicroserviceTest extends FlatSpec with Matchers {
     publishToKafka(pr)
     val res = consumeFirstMessageFrom[MessageEnvelope]("out")
     //We have to decode it as the helper here to get the payload returns a JsonNode and not a BinaryNode
-    val returnedUUID = UUIDUtil.bytesToUUID(Base64.getDecoder.decode(res.ubirchPacket.getPayload.asText()))
+    val payload = Base64.getDecoder.decode(res.ubirchPacket.getPayload.asText())
+    payload.size should equal(32)
+    val returnedUUID = UUIDUtil.bytesToUUID(payload)
     returnedUUID should equal (requestId)
   }
 
@@ -56,4 +58,5 @@ class ResponderMicroserviceTest extends FlatSpec with Matchers {
     res.ubirchPacket.getPayload.toString should equal ("""{"error":"RuntimeException: foo","causes":[],"microservice":"niomon-responder","requestId":"key"}""")
     res.ubirchPacket.getUUID should equal (UUID.fromString("deaddead-dead-dead-dead-deaddeaddead"))
   }
+
 }
