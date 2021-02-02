@@ -38,6 +38,8 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
 
   private final val payloadPadding = Array.fill[Byte](16)(0)
 
+  def uuidToBytesWithPadding(uuid: UUID, payloadPadding: Array[Byte] = payloadPadding): Array[Byte] = Array.concat(UUIDUtil.uuidToBytes(uuid), payloadPadding)
+
   def handleNormal(record: ConsumerRecord[String, MessageEnvelope]): ProducerRecord[String, MessageEnvelope] = {
 
     val tryResponseUPP = for {
@@ -46,8 +48,7 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
       //raw signatures
       requestIdAsBytesWithPadding <- Try(record.requestIdHeader().get)
         .map(UUID.fromString)
-        .map(UUIDUtil.uuidToBytes)
-        .map(r => Array.concat(r, payloadPadding))
+        .map(uuid => uuidToBytesWithPadding(uuid))
 
       requestUPP <- Try(record.value().ubirchPacket)
       payload <- Try(BinaryNode.valueOf(requestIdAsBytesWithPadding))
@@ -101,9 +102,9 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
       .map(x => "-" + x)
       .getOrElse("-0000")
 
-    def xcode(status: String) = previous + status +  xcodeHeader
+    def xcode(status: String): String = previous + status +  xcodeHeader
 
-    def xpayload = Try(BinaryNode.valueOf(UUIDUtil.uuidToBytes(UUID.fromString(requestId))))
+    def xpayload: Try[BinaryNode] = Try(BinaryNode.valueOf(uuidToBytesWithPadding(UUID.fromString(requestId))))
 
     logger.debug(s"record headers: $headers", v("requestId", requestId))
 
