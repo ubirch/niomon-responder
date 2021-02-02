@@ -36,12 +36,23 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
   private val normalHint = 0
   private val errorHint = 0
 
+  private final val payloadPadding = Array.fill[Byte](16)(0)
+
+  def uuidToBytesWithPadding(uuid: UUID, payloadPadding: Array[Byte] = payloadPadding): Array[Byte] = Array.concat(UUIDUtil.uuidToBytes(uuid), payloadPadding)
+
   def handleNormal(record: ConsumerRecord[String, MessageEnvelope]): ProducerRecord[String, MessageEnvelope] = {
 
     val tryResponseUPP = for {
-      requestId <- Try(record.requestIdHeader().get)
+      //We are adding 16 bytes in zeros to have a fixed payload of 32 bytes that
+      //will allow clients to better read the signatures when ecdsa is applied with
+      //raw signatures
+      requestIdAsBytesWithPadding <- Try(record.requestIdHeader().get)
+        .map(UUID.fromString)
+        .map(uuid => uuidToBytesWithPadding(uuid))
+
       requestUPP <- Try(record.value().ubirchPacket)
-      payload <- Try(BinaryNode.valueOf(UUIDUtil.uuidToBytes(UUID.fromString(requestId))))
+      payload <- Try(BinaryNode.valueOf(requestIdAsBytesWithPadding))
+
     } yield {
       val responseUPP = new ProtocolMessage()
       responseUPP.setVersion(requestUPP.getVersion)
@@ -91,9 +102,9 @@ class ResponderMicroservice(runtime: NioMicroservice[Either[String, MessageEnvel
       .map(x => "-" + x)
       .getOrElse("-0000")
 
-    def xcode(status: String) = previous + status +  xcodeHeader
+    def xcode(status: String): String = previous + status +  xcodeHeader
 
-    def xpayload = Try(BinaryNode.valueOf(UUIDUtil.uuidToBytes(UUID.fromString(requestId))))
+    def xpayload: Try[BinaryNode] = Try(BinaryNode.valueOf(uuidToBytesWithPadding(UUID.fromString(requestId))))
 
     logger.debug(s"record headers: $headers", v("requestId", requestId))
 
