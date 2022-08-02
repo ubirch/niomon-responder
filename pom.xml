@@ -56,6 +56,12 @@
             <organization>ubirch GmbH</organization>
             <organizationUrl>https://ubirch.com/</organizationUrl>
         </developer>
+        <developer>
+            <name>Carlos Sanchez</name>
+            <email>carlos.sanchezi@ubirch.com</email>
+            <organization>ubirch GmbH</organization>
+            <organizationUrl>https://ubirch.com/</organizationUrl>
+        </developer>
     </developers>
 
     <scm>
