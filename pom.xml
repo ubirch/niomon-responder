@@ -24,12 +24,12 @@
     <parent>
         <groupId>com.ubirch.niomon</groupId>
         <artifactId>parent</artifactId>
-        <version>1.0.3-SNAPSHOT</version>
+        <version>1.0.4-SNAPSHOT</version>
         <relativePath>../parent</relativePath>
     </parent>
 
     <artifactId>responder</artifactId>
-    <version>1.0.1-SNAPSHOT</version>
+    <version>1.0.4-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <licenses>
@@ -53,6 +53,12 @@
         <developer>
             <name>Mikołaj Robakowski</name>
             <email>mikolaj.robakowski@ubirch.com</email>
+            <organization>ubirch GmbH</organization>
+            <organizationUrl>https://ubirch.com/</organizationUrl>
+        </developer>
+        <developer>
+            <name>Carlos Sanchez</name>
+            <email>carlos.sanchezi@ubirch.com</email>
             <organization>ubirch GmbH</organization>
             <organizationUrl>https://ubirch.com/</organizationUrl>
         </developer>
@@ -84,12 +90,12 @@
         <dependency>
             <groupId>com.ubirch.niomon</groupId>
             <artifactId>foundation</artifactId>
-            <version>1.0.3-SNAPSHOT</version>
+            <version>1.0.4-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.ubirch.niomon</groupId>
             <artifactId>foundation-mock</artifactId>
-            <version>1.0.3-SNAPSHOT</version>
+            <version>1.0.4-SNAPSHOT</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
