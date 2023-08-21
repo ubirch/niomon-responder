@@ -1,5 +1,5 @@
 # GENERATED!, if you want to modify this, modify the file in `niomon-common-files` project
-FROM amazoncorretto:8u342
+FROM amazoncorretto:8u382
 ARG THIRD_PARTY_LIB
 ARG PROJECT_LIB
 ARG JAR_FILE
